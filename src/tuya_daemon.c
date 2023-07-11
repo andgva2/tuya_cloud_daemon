@@ -20,6 +20,8 @@ char *productId	   = "";
 char *deviceId	   = "";
 char *deviceSecret = "";
 
+atomic_int daemonize = 1;
+
 tuya_mqtt_context_t client_instance;
 
 const char *argp_program_version     = "Developement v0.9";
@@ -34,7 +36,6 @@ static char args_doc[] = "DeviceID Device_Secret ProductID";
 /* Used by main to communicate with parse_opt. */
 struct arguments {
 	char *args[3]; /* DeviceID, DeviceSecret ProductID */
-	atomic_int daemonize;
 };
 
 static struct argp_option options[] = { { "daemon_flag", 'd', "[ 1 | 0 ]", 0,
@@ -50,9 +51,9 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state)
 	switch (key) {
 	case 'd':
 		if (strcmp(arg, "0") == 0) {
-			arguments->daemonize = 0;
+			daemonize = 0;
 		} else if (strcmp(arg, "1") == 0) {
-			arguments->daemonize = 1;
+			daemonize = 1;
 		} else {
 			/* Invalid daemon flag, default fallback */
 			argp_usage(state);
@@ -84,23 +85,32 @@ static struct argp argp = { options, parse_opt, args_doc, doc };
 void on_connected(tuya_mqtt_context_t *context, void *user_data)
 {
 	TY_LOGI("on connected");
-	syslog(LOG_USER | LOG_INFO, "on connected");
+	if (daemonize) {
+		syslog(LOG_USER | LOG_INFO, "on connected");
+	}
 }
 
 void on_disconnect(tuya_mqtt_context_t *context, void *user_data)
 {
 	TY_LOGI("on disconnect");
-	syslog(LOG_USER | LOG_INFO, "on disconnect");
+	if (daemonize) {
+		syslog(LOG_USER | LOG_INFO, "on disconnect");
+	}
 }
 
 void on_messages(tuya_mqtt_context_t *context, void *user_data, const tuyalink_message_t *msg)
 {
 	TY_LOGI("on message id:%s, type:%d, code:%d", msg->msgid, msg->type, msg->code);
-	syslog(LOG_USER | LOG_INFO, "on message id:%s, type:%d, code:%d", msg->msgid, msg->type, msg->code);
+	if (daemonize) {
+		syslog(LOG_USER | LOG_INFO, "on message id:%s, type:%d, code:%d", msg->msgid, msg->type,
+		       msg->code);
+	}
 	switch (msg->type) {
 	case THING_TYPE_PROPERTY_REPORT_RSP:
 		TY_LOGI("property report response:%s", msg->data_string);
-		syslog(LOG_USER | LOG_INFO, "property report response:%s", msg->data_string);
+		if (daemonize) {
+			syslog(LOG_USER | LOG_INFO, "property report response:%s", msg->data_string);
+		}
 		break;
 	default:
 		break;
@@ -110,7 +120,9 @@ void on_messages(tuya_mqtt_context_t *context, void *user_data, const tuyalink_m
 void connected(tuya_mqtt_context_t *context, void *user_data)
 {
 	TY_LOGI("connected");
-	syslog(LOG_USER | LOG_INFO, "connected");
+	if (daemonize) {
+		syslog(LOG_USER | LOG_INFO, "connected");
+	}
 
 	char data[300];
 
@@ -125,22 +137,32 @@ void signal_handler(int sig)
 	case SIGTERM:
 	case SIGINT:
 		TY_LOGI("signal %d received, exiting...", sig);
-		syslog(LOG_USER | LOG_INFO, "signal %d received, exiting...", sig);
+		if (daemonize) {
+			syslog(LOG_USER | LOG_INFO, "signal %d received, exiting...", sig);
+		}
 		int ret = tuya_mqtt_disconnect(&client_instance);
 		if (ret) {
 			TY_LOGE("tuya_mqtt_disconnect failed");
-			syslog(LOG_USER | LOG_ERR, "tuya_mqtt_disconnect failed");
+			if (daemonize) {
+				syslog(LOG_USER | LOG_ERR, "tuya_mqtt_disconnect failed");
+			}
 		} else {
 			TY_LOGI("tuya_mqtt_disconnect success");
-			syslog(LOG_USER | LOG_INFO, "tuya_mqtt_disconnect success");
+			if (daemonize) {
+				syslog(LOG_USER | LOG_INFO, "tuya_mqtt_disconnect success");
+			}
 		}
 		ret = tuya_mqtt_deinit(&client_instance);
 		if (ret) {
 			TY_LOGE("tuya_mqtt_deinit failed");
-			syslog(LOG_USER | LOG_ERR, "tuya_mqtt_deinit failed");
+			if (daemonize) {
+				syslog(LOG_USER | LOG_ERR, "tuya_mqtt_deinit failed");
+			}
 		} else {
 			TY_LOGI("tuya_mqtt_deinit success");
-			syslog(LOG_USER | LOG_INFO, "tuya_mqtt_deinit success");
+			if (daemonize) {
+				syslog(LOG_USER | LOG_INFO, "tuya_mqtt_deinit success");
+			}
 		}
 		closelog();
 		exit(EXIT_SUCCESS);
@@ -158,10 +180,9 @@ int main(int argc, char **argv)
 
 	struct arguments arguments;
 
-	arguments.args[0]   = "";
-	arguments.args[1]   = "";
-	arguments.args[2]   = "";
-	arguments.daemonize = 1;
+	arguments.args[0] = "";
+	arguments.args[1] = "";
+	arguments.args[2] = "";
 
 	argp_parse(&argp, argc, argv, 0, 0, &arguments);
 
@@ -172,7 +193,7 @@ int main(int argc, char **argv)
 	int ret;
 
 	// turn this process into a daemon
-	if (arguments.daemonize) {
+	if (daemonize) {
 		ret = become_daemon(0);
 		if (ret) {
 			syslog(LOG_USER | LOG_ERR, "error starting tuya daemon");
@@ -223,12 +244,12 @@ disconnect:
 	ret = tuya_mqtt_disconnect(client);
 	if (ret) {
 		TY_LOGE("tuya_mqtt_disconnect failed");
-		if (arguments.daemonize) {
+		if (daemonize) {
 			syslog(LOG_USER | LOG_ERR, "tuya_mqtt_disconnect failed");
 		}
 	} else {
 		TY_LOGI("tuya_mqtt_disconnect success");
-		if (arguments.daemonize) {
+		if (daemonize) {
 			syslog(LOG_USER | LOG_INFO, "tuya_mqtt_disconnect success");
 		}
 	}
@@ -236,16 +257,16 @@ deinit:
 	ret = tuya_mqtt_deinit(client);
 	if (ret) {
 		TY_LOGE("tuya_mqtt_deinit failed");
-		if (arguments.daemonize) {
+		if (daemonize) {
 			syslog(LOG_USER | LOG_ERR, "tuya_mqtt_deinit failed");
 		}
 	} else {
 		TY_LOGI("tuya_mqtt_deinit success");
-		if (arguments.daemonize) {
+		if (daemonize) {
 			syslog(LOG_USER | LOG_INFO, "tuya_mqtt_deinit success");
 		}
 	}
-	if (arguments.daemonize) {
+	if (daemonize) {
 		closelog();
 	}
 
