@@ -9,7 +9,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
-#include <assert.h>
 #include <argp.h>
 #include <stdatomic.h>
 #include <syslog.h>
