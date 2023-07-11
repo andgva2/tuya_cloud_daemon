@@ -1,10 +1,3 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include <assert.h>
-#include <argp.h>
-#include <become_daemon/become_daemon.h>
-
 #include <sdk/cJSON.h>
 #include <sdk/tuya_cacert.h>
 #include <sdk/tuya_log.h>
@@ -13,24 +6,41 @@
 #include <sdk/mqtt_client_interface.h>
 #include <sdk/tuyalink_core.h>
 
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <assert.h>
+#include <argp.h>
+#include <stdatomic.h>
+#include <syslog.h>
+#include <signal.h>
+
+#include <become_daemon/become_daemon.h>
+
 char *productId	   = "";
 char *deviceId	   = "";
 char *deviceSecret = "";
 
+tuya_mqtt_context_t client_instance;
+
 const char *argp_program_version     = "Developement v0.9";
 const char *argp_program_bug_address = "<bug-gnu-utils@gnu.org>";
 
-static char doc[] = "Daemon program, that uses Tuya IoT Core SDK in C to connect and control your IoT products and devices in the cloud.";
+static char doc[] =
+	"Program to control your IoT products and devices in the cloud, using Tuya IoT Core SDK in C.";
 
 /* A description of the arguments we accept. */
 static char args_doc[] = "DeviceID Device_Secret ProductID";
 
 /* Used by main to communicate with parse_opt. */
 struct arguments {
-	char *args[3]; /* DeviceID, DeviceSecret & ProductID */
+	char *args[3]; /* DeviceID, DeviceSecret ProductID */
+	atomic_int daemonize;
 };
 
-static struct argp_option options[] = { { 0 } };
+static struct argp_option options[] = { { "daemon_flag", 'd', "[ 1 | 0 ]", 0,
+					  "Make the program run as daemon (1 - on, 0 - off, default - 1)" },
+					{ 0 } };
 
 static error_t parse_opt(int key, char *arg, struct argp_state *state)
 {
@@ -39,6 +49,17 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state)
 	struct arguments *arguments = state->input;
 
 	switch (key) {
+	case 'd':
+		if (strcmp(arg, "0") == 0) {
+			arguments->daemonize = 0;
+		} else if (strcmp(arg, "1") == 0) {
+			arguments->daemonize = 1;
+		} else {
+			/* Invalid daemon flag, default fallback */
+			argp_usage(state);
+		}
+		break;
+
 	case ARGP_KEY_ARG:
 		if (state->arg_num >= 3)
 			/* Too many arguments. */
@@ -47,7 +68,6 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state)
 		arguments->args[state->arg_num] = arg;
 
 		break;
-
 	case ARGP_KEY_END:
 		if (state->arg_num < 3)
 			/* Not enough arguments. */
@@ -62,153 +82,112 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state)
 
 static struct argp argp = { options, parse_opt, args_doc, doc };
 
-tuya_mqtt_context_t client_instance;
-
 void on_connected(tuya_mqtt_context_t *context, void *user_data)
 {
 	TY_LOGI("on connected");
-
-	char data[300];
-
-	snprintf(data, sizeof(data), "{}");
-	
-	tuyalink_thing_property_report(context, deviceId, data);
+	syslog(LOG_USER | LOG_INFO, "on connected");
 }
 
 void on_disconnect(tuya_mqtt_context_t *context, void *user_data)
 {
 	TY_LOGI("on disconnect");
+	syslog(LOG_USER | LOG_INFO, "on disconnect");
 }
 
 void on_messages(tuya_mqtt_context_t *context, void *user_data, const tuyalink_message_t *msg)
 {
 	TY_LOGI("on message id:%s, type:%d, code:%d", msg->msgid, msg->type, msg->code);
+	syslog(LOG_USER | LOG_INFO, "on message id:%s, type:%d, code:%d", msg->msgid, msg->type, msg->code);
 	switch (msg->type) {
-	case THING_TYPE_MODEL_RSP:
-		TY_LOGI("model response:%s", msg->data_string);
-		break;
-
 	case THING_TYPE_PROPERTY_REPORT_RSP:
 		TY_LOGI("property report response:%s", msg->data_string);
+		syslog(LOG_USER | LOG_INFO, "property report response:%s", msg->data_string);
 		break;
-
-	case THING_TYPE_PROPERTY_SET_RSP:
-		TY_LOGI("property set response:%s", msg->data_string);
-		break;
-
-	case THING_TYPE_PROPERTY_DESIRED_GET_RSP:
-		TY_LOGI("property desired get response:%s", msg->data_string);
-		break;
-
-	case THING_TYPE_PROPERTY_DESIRED_DEL_RSP:
-		TY_LOGI("property desired del response:%s", msg->data_string);
-		break;
-
-	case THING_TYPE_EVENT_TRIGGER_RSP:
-		TY_LOGI("event trigger response:%s", msg->data_string);
-		break;
-
-	case THING_TYPE_ACTION_EXECUTE_RSP:
-		TY_LOGI("action execute response:%s", msg->data_string);
-		break;
-
-	case THING_TYPE_BATCH_REPORT_RSP:
-		TY_LOGI("batch report response:%s", msg->data_string);
-		break;
-
-	case THING_TYPE_DEVICE_SUB_BIND_RSP:
-		TY_LOGI("device sub bind response:%s", msg->data_string);
-		break;
-
-	case THING_TYPE_DEVICE_TOPO_ADD_RSP:
-		TY_LOGI("device topo add response:%s", msg->data_string);
-		break;
-
-	case THING_TYPE_DEVICE_TOPO_DEL_RSP:
-		TY_LOGI("device topo del response:%s", msg->data_string);
-		break;
-
-	case THING_TYPE_DEVICE_TOPO_GET_RSP:
-		TY_LOGI("device topo get response:%s", msg->data_string);
-		break;
-
-	case THING_TYPE_OTA_FIRMWARE_REPORT:
-		TY_LOGI("ota firmware report:%s", msg->data_string);
-		break;
-
-	case THING_TYPE_OTA_GET_RSP:
-		TY_LOGI("ota get response:%s", msg->data_string);
-		break;
-
-	case THING_TYPE_EXT_CONFIG_GET_RSP:
-		TY_LOGI("ext config get response:%s", msg->data_string);
-		break;
-
-	case THING_TYPE_OTA_PROGRESS_REPORT:
-		TY_LOGI("ota progress report:%s", msg->data_string);
-		break;
-
-	case THING_TYPE_EXT_TIME_RESPONSE:
-		TY_LOGI("ext time response:%s", msg->data_string);
-		break;
-
-	case THING_TYPE_EXT_FILE_UPLOAD_RESPONSE:
-		TY_LOGI("ext file upload response:%s", msg->data_string);
-		break;
-
-	case THING_TYPE_EXT_FILE_DOWNLOAD_RESPONSE:
-		TY_LOGI("ext file download response:%s", msg->data_string);
-		break;
-
-	case THING_TYPE_CHANNEL_RPC_RESPONSE:
-		TY_LOGI("channel rpc response:%s", msg->data_string);
-		break;
-
-	case THING_TYPE_DEVICE_TAG_REPORT_RESPONSE:
-		TY_LOGI("device tag report response:%s", msg->data_string);
-		break;
-
-	case THING_TYPE_DEVICE_TAG_GET_RESPONSE:
-		TY_LOGI("device tag get response:%s", msg->data_string);
-		break;
-
-	case THING_TYPE_DEVICE_TAG_DELETE_RESPONSE:
-		TY_LOGI("device tag delete response:%s", msg->data_string);
-		break;
-
 	default:
 		break;
 	}
-	printf("\n");
+}
+
+void connected(tuya_mqtt_context_t *context, void *user_data)
+{
+	TY_LOGI("connected");
+	syslog(LOG_USER | LOG_INFO, "connected");
+
+	char data[300];
+
+	snprintf(data, sizeof(data), "{}");
+
+	tuyalink_thing_property_report(context, deviceId, data);
+}
+
+void signal_handler(int sig)
+{
+	switch (sig) {
+	case SIGTERM:
+	case SIGINT:
+		TY_LOGI("signal %d received, exiting...", sig);
+		syslog(LOG_USER | LOG_INFO, "signal %d received, exiting...", sig);
+		int ret = tuya_mqtt_disconnect(&client_instance);
+		if (ret) {
+			TY_LOGE("tuya_mqtt_disconnect failed");
+			syslog(LOG_USER | LOG_ERR, "tuya_mqtt_disconnect failed");
+		} else {
+			TY_LOGI("tuya_mqtt_disconnect success");
+			syslog(LOG_USER | LOG_INFO, "tuya_mqtt_disconnect success");
+		}
+		ret = tuya_mqtt_deinit(&client_instance);
+		if (ret) {
+			TY_LOGE("tuya_mqtt_deinit failed");
+			syslog(LOG_USER | LOG_ERR, "tuya_mqtt_deinit failed");
+		} else {
+			TY_LOGI("tuya_mqtt_deinit success");
+			syslog(LOG_USER | LOG_INFO, "tuya_mqtt_deinit success");
+		}
+		closelog();
+		exit(EXIT_SUCCESS);
+		break;
+	default:
+		exit(EXIT_FAILURE);
+		break;
+	}
 }
 
 int main(int argc, char **argv)
 {
+	signal(SIGTERM, signal_handler);
+	signal(SIGINT, signal_handler);
+
 	struct arguments arguments;
+
+	arguments.args[0]   = "";
+	arguments.args[1]   = "";
+	arguments.args[2]   = "";
+	arguments.daemonize = 1;
+
 	argp_parse(&argp, argc, argv, 0, 0, &arguments);
-	
+
 	deviceId     = arguments.args[0];
 	deviceSecret = arguments.args[1];
 	productId    = arguments.args[2];
-	
+
 	int ret;
 
 	// turn this process into a daemon
-	ret = become_daemon(0);
-	if (ret) {
-		return EXIT_FAILURE;
+	if (arguments.daemonize) {
+		ret = become_daemon(0);
+		if (ret) {
+			syslog(LOG_USER | LOG_ERR, "error starting tuya daemon");
+			closelog();
+			return EXIT_FAILURE;
+		}
+		const char *LOGNAME = "TUYA DAEMON";
+		openlog(LOGNAME, LOG_PID, LOG_USER);
+		syslog(LOG_USER | LOG_INFO, "starting");
 	}
-	
-	FILE *fl;
-	fl = popen("logger", "w");
-	dup2(fileno(fl), STDOUT_FILENO);
-	dup2(fileno(fl), STDERR_FILENO);
-
-	// we are now a daemon!
-	// stderr and stdout redirected to syslog
 
 	tuya_mqtt_context_t *client = &client_instance;
 
+	// initialize mqtt client
 	ret = tuya_mqtt_init(client, &(const tuya_mqtt_config_t){ .host		 = "m1.tuyacn.com",
 								  .port		 = 8883,
 								  .cacert	 = tuya_cacert_pem,
@@ -219,16 +198,57 @@ int main(int argc, char **argv)
 								  .timeout_ms	 = 2000,
 								  .on_connected	 = on_connected,
 								  .on_disconnect = on_disconnect,
-								  .on_messages	 = on_messages }); 
-	assert(ret == OPRT_OK);
-	
-	ret = tuya_mqtt_connect(client);
-	assert(ret == OPRT_OK);
+								  .on_messages	 = on_messages });
 
-	for (;;) {
-		tuya_mqtt_loop(client);
+	if (ret) {
+		TY_LOGE("tuya_mqtt_init failed");
+		syslog(LOG_USER | LOG_ERR, "tuya_mqtt_init failed");
+		goto deinit;
 	}
 
-	pclose(fl);
+	// connect to mqtt server
+	ret = tuya_mqtt_connect(client);
+	if (ret) {
+		TY_LOGE("tuya_mqtt_connect failed");
+		syslog(LOG_USER | LOG_ERR, "tuya_mqtt_connect failed");
+		goto disconnect;
+	}
+
+	// mqtt loop
+	while (true) {
+		tuya_mqtt_loop(client);
+		connected(client, NULL);
+	}
+
+disconnect:
+	ret = tuya_mqtt_disconnect(client);
+	if (ret) {
+		TY_LOGE("tuya_mqtt_disconnect failed");
+		if (arguments.daemonize) {
+			syslog(LOG_USER | LOG_ERR, "tuya_mqtt_disconnect failed");
+		}
+	} else {
+		TY_LOGI("tuya_mqtt_disconnect success");
+		if (arguments.daemonize) {
+			syslog(LOG_USER | LOG_INFO, "tuya_mqtt_disconnect success");
+		}
+	}
+deinit:
+	ret = tuya_mqtt_deinit(client);
+	if (ret) {
+		TY_LOGE("tuya_mqtt_deinit failed");
+		if (arguments.daemonize) {
+			syslog(LOG_USER | LOG_ERR, "tuya_mqtt_deinit failed");
+		}
+	} else {
+		TY_LOGI("tuya_mqtt_deinit success");
+		if (arguments.daemonize) {
+			syslog(LOG_USER | LOG_INFO, "tuya_mqtt_deinit success");
+		}
+	}
+	if (arguments.daemonize) {
+		closelog();
+	}
+
 	return EXIT_SUCCESS;
 }
