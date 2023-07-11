@@ -10,6 +10,10 @@ make all
 cd bin
 ./tuya_daemon [OPTION...] DeviceID Device_Secret ProductID
 ```
+Execution description
+```
+./tuya_daemon --help
+```
 To see program logs use
 ```
 journalctl -f
