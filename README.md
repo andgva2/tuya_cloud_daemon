@@ -8,7 +8,7 @@ In ./ execute:
 make clean
 make all
 cd bin
-./tuya_daemon [device_id] [device_secret] [product_id]
+./tuya_daemon [OPTION...] DeviceID Device_Secret ProductID
 ```
 To see program logs use
 ```
