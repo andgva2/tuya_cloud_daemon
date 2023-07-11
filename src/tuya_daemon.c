@@ -164,7 +164,9 @@ void signal_handler(int sig)
 				syslog(LOG_USER | LOG_INFO, "tuya_mqtt_deinit success");
 			}
 		}
-		closelog();
+		if (daemonize) {
+			closelog();
+		}
 		exit(EXIT_SUCCESS);
 		break;
 	default:
