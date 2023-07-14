@@ -1,15 +1,23 @@
-SRC_DIR:=./src
-LIB_DIR:=./lib
 SDK_DIR:=./sdk
+UTILS_DIR:=./utils
+SRC_DIR:=./src
 
-./PHONY: all clean
+./PHONY: all clean install uninstall
 
 all:
-	cd $(SDK_DIR) && $(MAKE) $@
-	cd $(LIB_DIR) && $(MAKE) $@
-	cd $(SRC_DIR) && $(MAKE) $@
+	$(MAKE) -C $(SDK_DIR)
+	$(MAKE) -C $(UTILS_DIR)
+	$(MAKE) -C $(SRC_DIR)
+
+install:
+	$(MAKE) $@ -C $(SDK_DIR)
+	$(MAKE) $@ -C $(SRC_DIR)
+
+uninstall:
+	$(MAKE) $@ -C $(SDK_DIR)
+	$(MAKE) $@ -C $(SRC_DIR)
 
 clean:
-	$(MAKE) -C $(LIB_DIR) $@
-	$(MAKE) -C $(SRC_DIR) $@
-	$(MAKE) -C $(SDK_DIR) $@
+	$(MAKE) $@ -C $(SRC_DIR)
+	$(MAKE) $@ -C $(UTILS_DIR)
+	$(MAKE) $@ -C $(SDK_DIR)

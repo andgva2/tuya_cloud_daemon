@@ -1,9 +1,13 @@
 INCLUDE_SDK_DIR:=../include/sdk
 SDK_BUILD_LIBS:=./build/lib
 LIBRARIES_DIR:=../lib
+LIBRARIES:=$(notdir $(wildcard $(LIBRARIES_DIR)/*.so))
 BUILD_DIR:=./build
+SYSTEM_LIBS_DIR:=/usr/lib
 
-.PHONY: all clean build
+
+
+.PHONY: all clean build install uninstall
 
 all: build
 
@@ -17,4 +21,11 @@ build:
 	cp -r $(SDK_BUILD_LIBS)/. $(LIBRARIES_DIR)
 	
 clean:
+	$(RM) -r $(LIBRARIES_DIR)
 	$(RM) -r $(BUILD_DIR)
+
+install: build
+	sudo cp -r $(LIBRARIES_DIR)/. $(SYSTEM_LIBS_DIR)/
+
+uninstall:
+	cd $(SYSTEM_LIBS_DIR) && sudo $(RM) $(LIBRARIES)
