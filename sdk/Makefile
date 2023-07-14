@@ -27,5 +27,5 @@ clean:
 install: build
 	sudo cp -r $(LIBRARIES_DIR)/. $(SYSTEM_LIBS_DIR)/
 
-uninstall:
+uninstall: build
 	cd $(SYSTEM_LIBS_DIR) && sudo $(RM) $(LIBRARIES)
