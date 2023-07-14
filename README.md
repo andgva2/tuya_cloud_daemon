@@ -5,14 +5,13 @@ Program to control your IoT products and devices in the cloud, using Tuya IoT Co
 Add wanted changes in ./src/tuya_daemon.c <br>
 In ./ execute: 
 ```
-make clean
 make all
-cd bin
-./tuya_daemon [OPTION...] DeviceID Device_Secret ProductID
+sudo make install
+tuya_daemon [OPTION...] DeviceID Device_Secret ProductID
 ```
 Execution description
 ```
-./tuya_daemon --help
+tuya_daemon --help
 ```
 To see program logs use
 ```
@@ -29,6 +28,10 @@ ps [PPID]
 Kill with:
 ```
 kill [PID]
+```
+To uninstall:
+```
+make uninstall
 ```
 
 # Credits & References
