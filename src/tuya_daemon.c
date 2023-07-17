@@ -18,7 +18,7 @@
 #include <utils/argp.h>
 
 int daemonize	   = 1;
-atomic_int running = 1;
+volatile sig_atomic_t running = 1;
 
 char *productId	   = "";
 char *deviceId	   = "";
