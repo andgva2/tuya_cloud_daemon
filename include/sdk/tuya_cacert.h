@@ -23,3 +23,5 @@ const char tuya_cacert_pem[] = {\
 "LPAvTK33sefOT6jEm0pUBsV/fdUID+Ic/n4XuKxe9tQWskMJDE32p2u0mYRlynqI\n"\
 "4uJEvlz36hz1\n"\
 "-----END CERTIFICATE-----\n"};
+
+const size_t tuya_cacert_pem_size = sizeof(tuya_cacert_pem);

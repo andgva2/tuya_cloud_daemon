@@ -5,9 +5,7 @@ LIBRARIES:=$(notdir $(wildcard $(LIBRARIES_DIR)/*.so))
 BUILD_DIR:=./build
 SYSTEM_LIBS_DIR:=/usr/lib
 
-
-
-.PHONY: all clean build install uninstall
+.PHONY: all clean build iqnstall uninstall
 
 all: build
 
@@ -27,5 +25,6 @@ clean:
 install: build
 	sudo cp -r $(LIBRARIES_DIR)/. $(SYSTEM_LIBS_DIR)/
 
-uninstall:
+uninstall: build
 	cd $(SYSTEM_LIBS_DIR) && sudo $(RM) $(LIBRARIES)
+	$(MAKE) clean -C ./
