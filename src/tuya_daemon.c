@@ -1,5 +1,6 @@
 #include <sdk/tuyalink_core.h>
 #include <sdk/tuya_log.h>
+#include <sdk/tuya_cacert.h>
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -11,7 +12,7 @@
 #include <utils/argp.h>
 #include <utils/tuya_utils.h>
 #include <utils/signal_handler.h>
-#include <sdk/tuya_cacert.h>
+
 tuya_mqtt_context_t client_instance;
 
 extern int is_daemon;
