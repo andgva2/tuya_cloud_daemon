@@ -1,4 +1,4 @@
-# tuya_cloud_daemon
+# tuya_daemon
 Program to control your IoT products and devices in the cloud, using Tuya IoT Core SDK in C.
 
 # Usage
