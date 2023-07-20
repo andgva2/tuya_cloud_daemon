@@ -12,7 +12,7 @@
 void on_connected(tuya_mqtt_context_t *context, void *user_data);
 void on_disconnect(tuya_mqtt_context_t *context, void *user_data);
 void on_messages(tuya_mqtt_context_t *context, void *user_data, const tuyalink_message_t *msg);
-void send_data(tuya_mqtt_context_t *context, void *user_data);
+void send_data(tuya_mqtt_context_t *context, char *user_data);
 int tuya_init(tuya_mqtt_context_t *client, const char *deviceId, const char *deviceSecret);
 int tuya_deinit(tuya_mqtt_context_t *client);
 int tuya_loop(tuya_mqtt_context_t *client);
